@@ -61,12 +61,7 @@
               ></el-input>
             </el-col>
             <el-col :span="9">
-              <el-button
-                size="mini"
-                type="success"
-                class="block"
-                @click="getSms()"
-              >
+              <el-button size="mini" type="success" class="block">
                 获取验证码
               </el-button>
             </el-col>
@@ -78,9 +73,8 @@
             type="danger"
             @click="submitForm('ruleForm')"
             class="block login-btn"
-            :disabled="loginBtnStatus"
           >
-            {{ model === 'login' ? '登录' : '注册' }}
+            提交
           </el-button>
         </el-form-item>
       </el-form>
@@ -89,7 +83,6 @@
 </template>
 
 <script>
-import { GetSms } from '@/api/login'
 import { reactive, ref, isRef, toRefs, onMounted } from '@vue/composition-api'
 import {
   stripscript,
@@ -99,8 +92,7 @@ import {
 } from '@/utils/validate'
 export default {
   name: 'login',
-  // setup(props, context)
-  setup(props, { refs, root }) {
+  setup(props, context) {
     //验证用户名
     let validateUsername = (rule, value, callback) => {
       if (value === '') {
@@ -168,8 +160,6 @@ export default {
     //模块值
     const model = ref('login')
     console.log(model.value)
-    //登录按钮禁用状态
-    const loginBtnStatus = ref(true)
     //表单绑定的数据
     const ruleForm = reactive({
       username: '',
@@ -198,37 +188,8 @@ export default {
       //修改模块值
       model.value = data.type
     }
-
-    /**
-     * 获取验证码
-     */
-    const getSms = () => {
-      //进行提示
-      if (ruleForm.username == '') {
-        root.$message.error('邮箱不能为空！！')
-        return false
-      }
-
-      if (!validateEmail(ruleForm.username)) {
-        root.$message.error('邮箱格式有误，请重新输入！！')
-        return false
-      }
-      //获取验证码接口
-      let requestData = {
-        username: ruleForm.username,
-        module: 'login'
-      }
-      GetSms(requestData)
-        .then(response => {})
-        .catch(error => {
-          console.log(error)
-        })
-    }
-    /**
-     * 提交表单
-     */
     const submitForm = formName => {
-      refs[formName].validate(valid => {
+      context.refs[formName].validate(valid => {
         if (valid) {
           alert('submit!')
         } else {
@@ -246,12 +207,10 @@ export default {
     return {
       menutab,
       model,
-      loginBtnStatus,
       ruleForm,
       rules,
       toggleMenu,
-      submitForm,
-      getSms
+      submitForm
     }
   }
 }
