@@ -5,5 +5,6 @@
 </template>
 
 <style lang="less">
- #app {}
+#app {
+}
 </style>

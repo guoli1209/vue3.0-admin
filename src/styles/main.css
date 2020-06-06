@@ -409,3 +409,22 @@ ul,
 li {
   list-style: none;
 }
+.el-submenu .el-menu-item {
+  font-size: 14px;
+  padding-left: 50px !important;
+}
+.el-submenu .el-menu-item.is-active {
+  background-color: rgba(245, 108, 108, 0.2) !important;
+}
+.el-submenu.is-active.is-opened .el-submenu__title {
+  background-color: #f56c6c !important;
+}
+.svg-icon.fontSize25 {
+  font-size: 25px;
+}
+.pull-left {
+  float: left;
+}
+.pull-right {
+  float: right;
+}

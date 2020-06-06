@@ -16,7 +16,7 @@
         :model="ruleForm"
         status-icon
         :rules="rules"
-        ref="ruleForm"
+        ref="loginForm"
         class="login-form"
         size="mini"
       >
@@ -66,8 +66,9 @@
                 type="success"
                 class="block"
                 @click="getSms()"
+                :disabled="codeBtnStatus.status"
               >
-                获取验证码
+                {{ codeBtnStatus.text }}
               </el-button>
             </el-col>
           </el-row>
@@ -76,7 +77,7 @@
         <el-form-item>
           <el-button
             type="danger"
-            @click="submitForm('ruleForm')"
+            @click="submitForm('loginForm')"
             class="block login-btn"
             :disabled="loginBtnStatus"
           >
@@ -89,7 +90,8 @@
 </template>
 
 <script>
-import { GetSms } from '@/api/login'
+import sha1 from 'sha1'
+import { GetSms, Register, Login } from '@/api/login'
 import { reactive, ref, isRef, toRefs, onMounted } from '@vue/composition-api'
 import {
   stripscript,
@@ -135,7 +137,7 @@ export default {
       value = ruleForm.passwords
       if (value === '') {
         callback(new Error('请再次输入密码'))
-      } else if (value != this.ruleForm.password) {
+      } else if (value != ruleForm.password) {
         callback(new Error('重复密码不正确'))
       } else {
         callback()
@@ -164,12 +166,18 @@ export default {
       { txt: '登录', current: true, type: 'login' },
       { txt: '注册', current: false, type: 'register' }
     ])
-    console.log(menutab)
     //模块值
     const model = ref('login')
     console.log(model.value)
     //登录按钮禁用状态
     const loginBtnStatus = ref(true)
+    //获取验证码禁用状态
+    const codeBtnStatus = reactive({
+      status: false,
+      text: '获取验证码'
+    })
+    //倒计时
+    const timer = ref(null)
     //表单绑定的数据
     const ruleForm = reactive({
       username: '',
@@ -183,6 +191,10 @@ export default {
       code: [{ validator: validateCode, trigger: 'blur' }],
       passwords: [{ validator: validatePasswords, trigger: 'blur' }]
     })
+    /**
+     * 1.不建议在一个方法里面做多件不同的事情（尽可能只做自己本身的事，不要做其他的事）
+     * 2.尽量把相同的事情封装一个方法里面，通过调用函数执行
+     */
 
     /**
      * 声明函数
@@ -197,8 +209,22 @@ export default {
       data.current = true
       //修改模块值
       model.value = data.type
+      resetFormData()
+      clearCountDown()
     }
-
+    //重置表单数据
+    const resetFormData = () => {
+      //重置表单
+      //  this.$refs[formName].resetFields();vue2.0写法
+      refs.loginForm.resetFields()
+    }
+    //更新按钮转台
+    const updataBtnStatus = params => {
+      //修改获取验证码按钮状态
+      codeBtnStatus.status = params.status
+      //修改获取验证码文本
+      codeBtnStatus.text = params.text
+    }
     /**
      * 获取验证码
      */
@@ -216,10 +242,26 @@ export default {
       //获取验证码接口
       let requestData = {
         username: ruleForm.username,
-        module: 'login'
+        module: model.value
       }
+      updataBtnStatus({
+        status: true,
+        text: '发送中'
+      })
+      //延时多长时间
       GetSms(requestData)
-        .then(response => {})
+        .then(response => {
+          let data = response.data
+          root.$message({
+            showClose: true,
+            message: data.message,
+            type: 'success'
+          })
+          //启用登录或注册按钮
+          loginBtnStatus.value = false
+          //调定时器，倒计时
+          countDown(60)
+        })
         .catch(error => {
           console.log(error)
         })
@@ -229,15 +271,100 @@ export default {
      */
     const submitForm = formName => {
       refs[formName].validate(valid => {
+        //表单验证通过
         if (valid) {
-          alert('submit!')
+          //三元运算
+          model.value === 'login' ? login() : register()
         } else {
           console.log('error submit!!')
           return false
         }
       })
     }
+    /**
+     * 登录
+     */
+    const login = () => {
+      let requestData = {
+        username: ruleForm.username,
+        password: sha1(ruleForm.password),
+        code: ruleForm.code
+      }
+      root.$store.dispatch('app/login', requestData).then(response => {
+          console.log('登录成功')
+          //页面跳转
+          root.$router.push('/console')
+          console.log(response)
+        }).catch((error) => {
+          console.log('登录失败')
+          console.log(error)
+        })
+     
+    }
+    /**
+     * 注册
+     */
+    const register = () => {
+      let requestData = {
+        username: ruleForm.username,
+        password: sha1(ruleForm.password),
+        code: ruleForm.code,
+        module: 'register'
+      }
 
+      Register(requestData)
+        .then(response => {
+          let data = response.data
+          root.$message({
+            showClose: true,
+            message: data.message,
+            type: 'success'
+          })
+          //模拟注册成功
+          toggleMenu(menutab[0])
+          clearCountDown()
+        })
+        .catch(error => {
+          console.log(error)
+        })
+    }
+    /**
+     * 倒计时
+     */
+    const countDown = number => {
+      //判读计时器是否存在，存在则清除
+      if (timer.value) {
+        clearInterval(timer.value)
+      }
+      //60和0没有见到，故意留bug
+      // setTimeout:clearTimeout(变量) 只执行一次
+      // setInterval:clearInterval(变量) 不断执行，需要条件才执行
+      let time = number
+      timer.value = setInterval(() => {
+        time--
+        if (time === 0) {
+          clearInterval(timer.value)
+          updataBtnStatus({
+            status: false,
+            text: '再次获取'
+          })
+        } else {
+          codeBtnStatus.text = `倒计时${time}秒`
+        }
+      }, 1000)
+    }
+    /**
+     * 清除倒计时
+     */
+    const clearCountDown = () => {
+      updataBtnStatus({
+        status: false,
+        text: '获取验证码'
+      })
+
+      //清除计时器
+      clearInterval(timer.value)
+    }
     /**
      * 生命周期
      */
@@ -247,11 +374,19 @@ export default {
       menutab,
       model,
       loginBtnStatus,
+      codeBtnStatus,
+      timer,
       ruleForm,
       rules,
       toggleMenu,
       submitForm,
-      getSms
+      getSms,
+      countDown,
+      clearCountDown,
+      login,
+      register,
+      resetFormData,
+      updataBtnStatus
     }
   }
 }
@@ -301,3 +436,15 @@ export default {
   }
 }
 </style>
+<!--
+密码加密：
+1、在前端预先加密一次
+登录的密码：123456（普通字符串）
+经过加密后：sha1('123456') == '541216ad5s4f5ds1f5asd4f65asd4' （加密后的字符串）
+2、后台加密
+接收到字符串：'541216ad5s4f5ds1f5asd4f65asd4'
+后台再次加密：md5('541216ad5s4f5ds1f5asd4f65asd4') == '8f9qwersd3g165y4d1sf3s1f6aew4'（最终的加密后的密码）
+最终新的字符串写入数据库：8f9qwersd3g165y4d1sf3s1f6aew4
+3、登录
+用户名与加密后的密码进行匹配，成功则登录，失败则提示
+-->
